@@ -1,0 +1,36 @@
+# Binaries
+pr-complexity
+pr-complexity-*
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+dist/
+build/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Test cache
+*.test
+*.out
+
+# Temp files written by the Python analyzer
+/tmp/pr-complexity-*
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
