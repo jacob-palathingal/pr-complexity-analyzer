@@ -1,45 +1,9 @@
 package diff
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
-
-func import_os_write(path, content string) {
-	_ = os.WriteFile(path, []byte(content), 0644)
-}
-
-func makeTestRepo(t *testing.T) (*Client, string) {
-	t.Helper()
-	dir := t.TempDir()
-
-	run := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("%v: %s", args, out)
-		}
-	}
-
-	run("git", "init")
-	run("git", "config", "user.email", "test@test.com")
-	run("git", "config", "user.name", "Test")
-	run("git", "checkout", "-b", "main")
-
-	import_os_write(filepath.Join(dir, "hello.py"), "def hi():\n    pass\n")
-	run("git", "add", ".")
-	run("git", "commit", "-m", "initial")
-
-	import_os_write(filepath.Join(dir, "hello.py"), "def hi():\n    x = 1\n    return x\n")
-	run("git", "add", ".")
-	run("git", "commit", "-m", "modify")
-
-	return NewClient(dir), dir
-}
 
 func TestResolveRef(t *testing.T) {
 	client, _ := makeTestRepo(t)
