@@ -1,6 +1,6 @@
 package main
 
-import "github.com/yourusername/pr-complexity-analyzer/cmd"
+import "github.com/jacob-palathingal/pr-complexity-analyzer/cmd"
 
 func main() {
 	cmd.Execute()
