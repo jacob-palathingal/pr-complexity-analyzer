@@ -42,7 +42,7 @@ func (p *Parser) BuildDiffs(baseRef, headRef string) ([]FileDiff, error) {
 			return nil, fmt.Errorf("reading %s at %s: %w", path, headRef, err)
 		}
 
-		// Skip pure deletions — nothing to analyze.
+		// Skip pure deletions.
 		if newContent == "" {
 			continue
 		}

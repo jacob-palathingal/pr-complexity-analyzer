@@ -7,6 +7,17 @@ import (
 	"testing"
 )
 
+// Shared test helpers for the diff package
+func import_os_write(path, content string) {
+	_ = os.WriteFile(path, []byte(content), 0644)
+}
+
+func runGit(dir string, args ...string) error {
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = dir
+	return cmd.Run()
+}
+
 func makeTestRepo(t *testing.T) (*Client, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -35,15 +46,8 @@ func makeTestRepo(t *testing.T) (*Client, string) {
 
 	return NewClient(dir), dir
 }
-func import_os_write(path, content string) {
-	_ = os.WriteFile(path, []byte(content), 0644)
-}
 
-func runGit(dir string, args ...string) error {
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = dir
-	return cmd.Run()
-}
+// Parser tests
 
 func TestBuildDiffs(t *testing.T) {
 	client, _ := makeTestRepo(t)
