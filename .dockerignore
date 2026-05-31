@@ -1,0 +1,19 @@
+# Don't copy build artifacts or dev files into the Docker build context.
+dist/
+build/
+*.test
+*.out
+
+# Git history is not needed inside the image.
+# (The tool runs against a mounted repo at /repo, not the source tree.)
+.git/
+
+# Editor and OS noise.
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Local env files.
+.env
+.env.*
