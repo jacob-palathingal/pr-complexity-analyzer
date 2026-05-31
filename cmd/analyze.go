@@ -1,6 +1,12 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+	"os"
+
+	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/runner"
+	"github.com/spf13/cobra"
+)
 
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze",
@@ -29,16 +35,29 @@ var (
 func init() {
 	analyzeCmd.Flags().StringVar(&flagBase, "base", "", "Base git ref (branch, tag, or commit SHA) (required)")
 	analyzeCmd.Flags().StringVar(&flagHead, "head", "HEAD", "Head git ref (branch, tag, or commit SHA)")
-	analyzeCmd.Flags().IntVar(&flagThreshold, "threshold", 0, "Only report functions with complexity increase >= this value")
+	analyzeCmd.Flags().IntVar(&flagThreshold, "threshold", 0, "Only report functions whose complexity increased by at least this amount")
 	analyzeCmd.Flags().BoolVar(&flagJSON, "json", false, "Output results as JSON instead of a table")
 	analyzeCmd.Flags().StringVar(&flagLang, "lang", "", "Restrict analysis to a specific language (e.g. python)")
-	analyzeCmd.Flags().BoolVar(&flagUnchanged, "include-unchanged", false, "Include functions with no complexity change")
+	analyzeCmd.Flags().BoolVar(&flagUnchanged, "include-unchanged", false, "Include functions with no complexity change in the report")
 	analyzeCmd.Flags().StringVar(&flagRepoDir, "repo", "", "Path to the git repository (default: current directory)")
+
 	_ = analyzeCmd.MarkFlagRequired("base")
 }
 
-// runAnalyze is wired up in commit 07. Stub so binary compiles now.
 func runAnalyze(cmd *cobra.Command, args []string) error {
-	cmd.Println("analyze: not yet implemented")
+	cfg := runner.Config{
+		RepoDir:          flagRepoDir,
+		BaseRef:          flagBase,
+		HeadRef:          flagHead,
+		MinDelta:         flagThreshold,
+		IncludeUnchanged: flagUnchanged,
+		JSON:             flagJSON,
+		LangFilter:       flagLang,
+	}
+
+	if err := runner.Run(os.Stdout, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return err
+	}
 	return nil
 }
