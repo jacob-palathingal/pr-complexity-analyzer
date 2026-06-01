@@ -1,0 +1,78 @@
+$ pr-complexity analyze --base main --head feature/payment-refactor
+
+  PR Complexity Report — 6 function(s) changed
+
+  File                        Function                   Before  After  Delta
+  --------------------------  -------------------------  ------  -----  -----
+  payments/processor.py       PaymentProcessor.charge         3     11   +8 ▲
+  auth/session.py             SessionManager.validate         2      9   +7 ▲
+  payments/processor.py       PaymentProcessor.refund         4      8   +4 ▲
+  auth/session.py             create_token                    1      4   +3 ▲
+  utils/retry.py              with_retry                      0      3   +3 ▲
+  models/order.py             Order.apply_discount            5      7   +2 ▲
+
+
+$ pr-complexity analyze --base main --head feature/payment-refactor --threshold 5
+
+  PR Complexity Report — 2 function(s) changed
+
+  File                        Function                   Before  After  Delta
+  --------------------------  -------------------------  ------  -----  -----
+  payments/processor.py       PaymentProcessor.charge         3     11   +8 ▲
+  auth/session.py             SessionManager.validate         2      9   +7 ▲
+
+
+$ pr-complexity analyze --base HEAD~1 --head HEAD --json
+{
+  "generated_at": "2024-11-14T09:22:41Z",
+  "total_count": 6,
+  "results": [
+    {
+      "file_path": "payments/processor.py",
+      "function_name": "PaymentProcessor.charge",
+      "old_complexity": 3,
+      "new_complexity": 11,
+      "delta": 8
+    },
+    {
+      "file_path": "auth/session.py",
+      "function_name": "SessionManager.validate",
+      "old_complexity": 2,
+      "new_complexity": 9,
+      "delta": 7
+    },
+    {
+      "file_path": "payments/processor.py",
+      "function_name": "PaymentProcessor.refund",
+      "old_complexity": 4,
+      "new_complexity": 8,
+      "delta": 4
+    },
+    {
+      "file_path": "auth/session.py",
+      "function_name": "create_token",
+      "old_complexity": 1,
+      "new_complexity": 4,
+      "delta": 3
+    },
+    {
+      "file_path": "utils/retry.py",
+      "function_name": "with_retry",
+      "old_complexity": 0,
+      "new_complexity": 3,
+      "delta": 3
+    },
+    {
+      "file_path": "models/order.py",
+      "function_name": "Order.apply_discount",
+      "old_complexity": 5,
+      "new_complexity": 7,
+      "delta": 2
+    }
+  ]
+}
+
+
+$ pr-complexity analyze --base main --head feature/cleanup
+
+✓  No complexity increases found in this PR.
