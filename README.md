@@ -1,5 +1,7 @@
 # pr-complexity
 
+![Release](https://github.com/jacob-palathingal/pr-complexity-analyzer/actions/workflows/release.yml/badge.svg)
+
 > Per-function cyclomatic complexity deltas, scoped to exactly what your PR touches.
 
 `pr-complexity` fills the gap between line-count tools (Danger.js, GitHub's native diff view) and whole-codebase scanners (SonarQube, CodeClimate). It checks out both sides of a diff, runs complexity analysis only on changed files, and ranks functions by how much more complex they became — in seconds, with no SaaS account.
@@ -9,7 +11,7 @@
 **With Docker (no local setup needed):**
 
 ```bash
-docker run --rm -v $(pwd):/repo ghcr.io/yourusername/pr-complexity:latest \
+docker run --rm -v $(pwd):/repo ghcr.io/jacob-palathingal/pr-complexity-analyzer:latest \
   analyze --base main --head HEAD
 ```
 
