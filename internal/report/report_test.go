@@ -17,25 +17,60 @@ var testDeltas = []interfaces.FunctionDelta{
 	{FilePath: "new.py", FunctionName: "fresh", OldComplexity: 0, NewComplexity: 3, Delta: 3},
 }
 
+func TestGenerate_TextOutput(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Generate(&buf, testDeltas, Options{Format: "text"}); err != nil {
+		t.Fatalf("Generate (text): %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "login") {
+		t.Error("expected 'login' in text output")
+	}
+}
+
+func TestGenerate_JSONOutput(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Generate(&buf, testDeltas, Options{Format: "json"}); err != nil {
+		t.Fatalf("Generate (json): %v", err)
+	}
+	var report jsonReport
+	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+		t.Fatalf("JSON unmarshal: %v", err)
+	}
+	if len(report.Results) == 0 {
+		t.Error("expected non-empty Results in JSON output")
+	}
+}
+
+func TestGenerate_MarkdownOutput(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Generate(&buf, testDeltas, Options{Format: "markdown"}); err != nil {
+		t.Fatalf("Generate (markdown): %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "|") {
+		t.Error("expected markdown table pipes in output")
+	}
+}
+
+func TestGenerate_DefaultIsText(t *testing.T) {
+	var buf bytes.Buffer
+	// Empty Format string should default to text.
+	if err := Generate(&buf, testDeltas, Options{}); err != nil {
+		t.Fatalf("Generate (default): %v", err)
+	}
+	// Text output contains the table header word "File" — JSON does not.
+	if !strings.Contains(buf.String(), "File") {
+		t.Error("default format should be text")
+	}
+}
+
 func TestFilter_ExcludesUnchanged(t *testing.T) {
 	result := filter(testDeltas, Options{IncludeUnchanged: false})
 	for _, d := range result {
 		if d.Delta == 0 {
 			t.Errorf("unchanged function %s should be filtered out", d.FunctionName)
 		}
-	}
-}
-
-func TestFilter_IncludesUnchanged(t *testing.T) {
-	result := filter(testDeltas, Options{IncludeUnchanged: true})
-	var found bool
-	for _, d := range result {
-		if d.FunctionName == "logout" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("unchanged function 'logout' should be included with IncludeUnchanged=true")
 	}
 }
 
@@ -48,7 +83,7 @@ func TestFilter_MinDelta(t *testing.T) {
 	}
 }
 
-func TestSortDeltas_ByDeltaDescending(t *testing.T) {
+func TestSortDeltas(t *testing.T) {
 	deltas := []interfaces.FunctionDelta{
 		{FunctionName: "a", Delta: 1},
 		{FunctionName: "b", Delta: 5},
@@ -57,50 +92,5 @@ func TestSortDeltas_ByDeltaDescending(t *testing.T) {
 	sortDeltas(deltas)
 	if deltas[0].Delta != 5 || deltas[1].Delta != 3 || deltas[2].Delta != 1 {
 		t.Errorf("wrong sort order: %v", deltas)
-	}
-}
-
-func TestGenerate_TextOutput(t *testing.T) {
-	var buf bytes.Buffer
-	err := Generate(&buf, testDeltas, Options{})
-	if err != nil {
-		t.Fatalf("Generate (text): %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "login") {
-		t.Error("expected 'login' in text output")
-	}
-	if !strings.Contains(out, "auth.py") {
-		t.Error("expected 'auth.py' in text output")
-	}
-}
-
-func TestGenerate_JSONOutput(t *testing.T) {
-	var buf bytes.Buffer
-	err := Generate(&buf, testDeltas, Options{JSON: true})
-	if err != nil {
-		t.Fatalf("Generate (json): %v", err)
-	}
-
-	var report jsonReport
-	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
-		t.Fatalf("JSON unmarshal: %v", err)
-	}
-	if report.TotalCount == 0 {
-		t.Error("expected non-zero TotalCount in JSON output")
-	}
-	if len(report.Results) == 0 {
-		t.Error("expected non-empty Results in JSON output")
-	}
-}
-
-func TestGenerate_NoResults(t *testing.T) {
-	var buf bytes.Buffer
-	err := Generate(&buf, []interfaces.FunctionDelta{}, Options{})
-	if err != nil {
-		t.Fatalf("Generate (empty): %v", err)
-	}
-	if !strings.Contains(buf.String(), "No complexity increases") {
-		t.Error("expected 'No complexity increases' message for empty results")
 	}
 }

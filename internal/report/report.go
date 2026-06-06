@@ -1,4 +1,3 @@
-// Package report sorts FunctionDelta results and dispatches to a Formatter.
 package report
 
 import (
@@ -8,35 +7,35 @@ import (
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces"
 )
 
-// Options controls which deltas are included and how they're rendered.
+// Options controls which deltas are included and how they are rendered.
 type Options struct {
-	// MinDelta filters out functions whose complexity change is below this value.
-	// 0 (default) includes all changed functions.
+	// MinDelta filters out functions whose delta is below this value.
 	MinDelta int
 
-	// IncludeUnchanged includes functions with Delta == 0 when true.
+	// IncludeUnchanged includes zero-delta functions when true.
 	IncludeUnchanged bool
 
-	// JSON switches to machine-readable output.
-	JSON bool
+	// Format selects the output formatter: "text" (default), "json", "markdown".
+	Format string
 }
 
-// Generate filters deltas by opts, sorts them by descending Delta (then by
-// file+function name for stability), and writes a report to w.
+// Generate filters, sorts, and writes the report to w.
 func Generate(w io.Writer, deltas []interfaces.FunctionDelta, opts Options) error {
 	filtered := filter(deltas, opts)
 	sortDeltas(filtered)
 
 	var f Formatter
-	if opts.JSON {
+	switch opts.Format {
+	case "json":
 		f = &JSONFormatter{}
-	} else {
+	case "markdown":
+		f = &MarkdownFormatter{}
+	default:
 		f = &TextFormatter{}
 	}
 	return f.Format(w, filtered)
 }
 
-// filter returns only the deltas that satisfy opts.
 func filter(deltas []interfaces.FunctionDelta, opts Options) []interfaces.FunctionDelta {
 	out := make([]interfaces.FunctionDelta, 0, len(deltas))
 	for _, d := range deltas {
@@ -51,7 +50,6 @@ func filter(deltas []interfaces.FunctionDelta, opts Options) []interfaces.Functi
 	return out
 }
 
-// sortDeltas sorts by Delta descending, then FilePath+FunctionName ascending.
 func sortDeltas(deltas []interfaces.FunctionDelta) {
 	sort.Slice(deltas, func(i, j int) bool {
 		if deltas[i].Delta != deltas[j].Delta {

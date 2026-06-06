@@ -1,6 +1,3 @@
-// Package runner ties together the diff engine, analyzer registry, and report
-// generator into a single Run call. It is the only package that knows about
-// all three layers; cmd/ calls runner.Run and handles CLI flag parsing.
 package runner
 
 import (
@@ -14,52 +11,52 @@ import (
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/report"
 )
 
-// Config holds everything Run needs, sourced directly from CLI flags.
+// Exit code constants.
+const (
+	ExitOK        = 0 // No threshold breaches, or no threshold configured.
+	ExitThreshold = 1 // At least one function met or exceeded --threshold.
+	ExitError     = 2 // Tool error (bad ref, missing git, analyzer failure).
+)
+
+// Config holds all run parameters sourced from CLI flags and config file.
 type Config struct {
-	// RepoDir is the path to the git repository. Empty string = cwd.
-	RepoDir string
-
-	// BaseRef and HeadRef are the git refs to compare.
-	BaseRef string
-	HeadRef string
-
-	// MinDelta filters out functions with a complexity increase below this value.
-	MinDelta int
-
-	// IncludeUnchanged adds zero-delta functions to the report.
+	RepoDir          string
+	BaseRef          string
+	HeadRef          string
+	MinDelta         int
 	IncludeUnchanged bool
-
-	// JSON switches to JSON output.
-	JSON bool
-
-	// LangFilter restricts analysis to analyzers whose Name() contains this string.
-	// Empty string means all languages.
+	// Format selects the output formatter: "text" (default), "json", "markdown".
+	Format     string
 	LangFilter string
+	// Threshold is the delta that triggers ExitThreshold. 0 = disabled.
+	Threshold int
 }
 
-// registry is the list of all known language analyzers, in dispatch order.
-// To add a new language: implement interfaces.Analyzer and append here.
+// Result carries the recommended exit code and breach count.
+type Result struct {
+	ExitCode          int
+	BreachedFunctions int
+}
+
 var registry = []interfaces.Analyzer{
 	python.New(),
 }
 
-// Run executes the full analysis pipeline and writes the report to w.
-func Run(w io.Writer, cfg Config) error {
-	// 1. Build diffs.
+// Run executes the full pipeline and returns a Result with the exit code.
+func Run(w io.Writer, cfg Config) (Result, error) {
 	gitClient := diff.NewClient(cfg.RepoDir)
 	parser := diff.NewParser(gitClient)
 
 	fileDiffs, err := parser.BuildDiffs(cfg.BaseRef, cfg.HeadRef)
 	if err != nil {
-		return fmt.Errorf("building diffs: %w", err)
+		return Result{ExitCode: ExitError}, fmt.Errorf("building diffs: %w", err)
 	}
 
 	if len(fileDiffs) == 0 {
 		fmt.Fprintln(w, "No files changed between the given refs.")
-		return nil
+		return Result{ExitCode: ExitOK}, nil
 	}
 
-	// 2. Dispatch each file to the appropriate analyzer.
 	var allDeltas []interfaces.FunctionDelta
 	var unsupported []string
 
@@ -69,30 +66,48 @@ func Run(w io.Writer, cfg Config) error {
 			unsupported = append(unsupported, fd.Path)
 			continue
 		}
-
 		deltas, err := analyzer.Analyze(fd.Path, fd.OldContent, fd.NewContent)
 		if err != nil {
-			return fmt.Errorf("analyzing %s: %w", fd.Path, err)
+			return Result{ExitCode: ExitError}, fmt.Errorf("analyzing %s: %w", fd.Path, err)
 		}
 		allDeltas = append(allDeltas, deltas...)
 	}
 
-	// Warn about unsupported files (don't fail — PRs often touch configs etc.).
 	if len(unsupported) > 0 {
 		fmt.Fprintf(w, "⚠  Skipped %d file(s) with no supported analyzer: %s\n\n",
 			len(unsupported), strings.Join(unsupported, ", "))
 	}
 
-	// 3. Generate report.
-	return report.Generate(w, allDeltas, report.Options{
+	if err := report.Generate(w, allDeltas, report.Options{
 		MinDelta:         cfg.MinDelta,
 		IncludeUnchanged: cfg.IncludeUnchanged,
-		JSON:             cfg.JSON,
-	})
+		Format:           cfg.Format,
+	}); err != nil {
+		return Result{ExitCode: ExitError}, err
+	}
+
+	return applyThreshold(w, cfg, allDeltas), nil
 }
 
-// findAnalyzer returns the first registered analyzer that supports path and
-// matches the optional langFilter. Returns nil if none match.
+// applyThreshold counts breaches and prints a summary line if any are found.
+func applyThreshold(w io.Writer, cfg Config, deltas []interfaces.FunctionDelta) Result {
+	if cfg.Threshold <= 0 {
+		return Result{ExitCode: ExitOK}
+	}
+	var breached int
+	for _, d := range deltas {
+		if d.Delta >= cfg.Threshold {
+			breached++
+		}
+	}
+	if breached > 0 {
+		fmt.Fprintf(w, "\n✗  %d function(s) exceeded the complexity threshold of +%d\n",
+			breached, cfg.Threshold)
+		return Result{ExitCode: ExitThreshold, BreachedFunctions: breached}
+	}
+	return Result{ExitCode: ExitOK}
+}
+
 func findAnalyzer(path, langFilter string) interfaces.Analyzer {
 	for _, a := range registry {
 		if langFilter != "" && !strings.Contains(a.Name(), langFilter) {

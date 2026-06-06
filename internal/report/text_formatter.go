@@ -19,7 +19,7 @@ type TextFormatter struct{}
 
 func (f *TextFormatter) Format(w io.Writer, deltas []interfaces.FunctionDelta) error {
 	if len(deltas) == 0 {
-		_, err := fmt.Fprintln(w, "✓  No complexity increases found in this PR.")
+		_, err := fmt.Fprintln(w, "No complexity increases found in this PR.")
 		return err
 	}
 
