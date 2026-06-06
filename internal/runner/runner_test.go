@@ -81,3 +81,23 @@ func TestApplyThreshold_WritesBreachMessage(t *testing.T) {
 		t.Error("expected breach message written to output")
 	}
 }
+
+func TestApplyThreshold_JSONDoesNotWriteMessage(t *testing.T) {
+	var buf bytes.Buffer
+	cfg := Config{Threshold: 3, Format: "json"}
+	result := applyThreshold(&buf, cfg, []interfaces.FunctionDelta{
+		{FunctionName: "complex", Delta: 6},
+	})
+	if result.ExitCode != ExitThreshold {
+		t.Fatalf("expected ExitThreshold, got %d", result.ExitCode)
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("json threshold handling should not write prose to stdout, got %q", buf.String())
+	}
+}
+
+func TestNormalizeFormat_DefaultsToText(t *testing.T) {
+	if got := normalizeFormat(""); got != "text" {
+		t.Fatalf("normalizeFormat empty = %q, want text", got)
+	}
+}

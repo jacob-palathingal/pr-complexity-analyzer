@@ -11,7 +11,7 @@ import (
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze",
 	Short: "Analyze complexity changes between two git refs",
-	Long: `Compares cyclomatic complexity of every function in files changed
+	Long: `Compares cyclomatic complexity of every function in supported files changed
 between --base and --head git refs.
 
 Exit codes:
@@ -22,6 +22,7 @@ Exit codes:
 Examples:
   pr-complexity analyze --base main --head feature/my-branch
   pr-complexity analyze --base HEAD~1 --head HEAD --threshold 5
+  pr-complexity analyze --base main --head HEAD --min-delta 3
   pr-complexity analyze --base main --head HEAD --format json
   pr-complexity analyze --base main --head HEAD --format markdown
 `,
@@ -32,6 +33,7 @@ var (
 	flagBase      string
 	flagHead      string
 	flagThreshold int
+	flagMinDelta  int
 	flagFormat    string
 	flagLang      string
 	flagUnchanged bool
@@ -42,6 +44,7 @@ func init() {
 	analyzeCmd.Flags().StringVar(&flagBase, "base", "", "Base git ref (branch, tag, or commit SHA) (required)")
 	analyzeCmd.Flags().StringVar(&flagHead, "head", "HEAD", "Head git ref (branch, tag, or commit SHA)")
 	analyzeCmd.Flags().IntVar(&flagThreshold, "threshold", 0, "Exit 1 if any function delta meets or exceeds this value (0 = disabled)")
+	analyzeCmd.Flags().IntVar(&flagMinDelta, "min-delta", 0, "Only report functions with delta greater than or equal to this value")
 	analyzeCmd.Flags().StringVar(&flagFormat, "format", "text", "Output format: text, json, or markdown")
 	analyzeCmd.Flags().StringVar(&flagLang, "lang", "", "Restrict analysis to a specific language (e.g. python, go)")
 	analyzeCmd.Flags().BoolVar(&flagUnchanged, "include-unchanged", false, "Include functions with no complexity change")
@@ -55,6 +58,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		RepoDir:          flagRepoDir,
 		BaseRef:          flagBase,
 		HeadRef:          flagHead,
+		MinDelta:         flagMinDelta,
 		IncludeUnchanged: flagUnchanged,
 		Format:           flagFormat,
 		LangFilter:       flagLang,

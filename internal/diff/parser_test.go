@@ -112,3 +112,33 @@ func TestBuildDiffs_NewFile(t *testing.T) {
 		t.Error("new_file.py not found in diffs")
 	}
 }
+
+func TestBuildDiffs_EmptiedFileIsStillIncluded(t *testing.T) {
+	client, dir := makeTestRepo(t)
+
+	emptyPath := filepath.Join(dir, "hello.py")
+	if err := os.WriteFile(emptyPath, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := runGit(dir, "git", "add", "."); err != nil {
+		t.Fatal(err)
+	}
+	if err := runGit(dir, "git", "commit", "-m", "empty file"); err != nil {
+		t.Fatal(err)
+	}
+
+	parser := NewParser(client)
+	diffs, err := parser.BuildDiffs("HEAD~1", "HEAD")
+	if err != nil {
+		t.Fatalf("BuildDiffs: %v", err)
+	}
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff, got %d", len(diffs))
+	}
+	if diffs[0].Path != "hello.py" {
+		t.Fatalf("expected hello.py, got %q", diffs[0].Path)
+	}
+	if diffs[0].NewContent != "" {
+		t.Fatalf("expected empty NewContent for emptied file, got %q", diffs[0].NewContent)
+	}
+}

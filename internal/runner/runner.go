@@ -44,6 +44,11 @@ var registry = []interfaces.Analyzer{
 
 // Run executes the full pipeline and returns a Result with the exit code.
 func Run(w io.Writer, cfg Config) (Result, error) {
+	cfg.Format = normalizeFormat(cfg.Format)
+	if !supportedFormat(cfg.Format) {
+		return Result{ExitCode: ExitError}, fmt.Errorf("unsupported format %q (supported: text, json, markdown)", cfg.Format)
+	}
+
 	gitClient := diff.NewClient(cfg.RepoDir)
 	parser := diff.NewParser(gitClient)
 
@@ -53,7 +58,17 @@ func Run(w io.Writer, cfg Config) (Result, error) {
 	}
 
 	if len(fileDiffs) == 0 {
-		fmt.Fprintln(w, "No files changed between the given refs.")
+		if cfg.Format == "json" {
+			if err := report.Generate(w, nil, report.Options{
+				MinDelta:         cfg.MinDelta,
+				IncludeUnchanged: cfg.IncludeUnchanged,
+				Format:           cfg.Format,
+			}); err != nil {
+				return Result{ExitCode: ExitError}, err
+			}
+		} else {
+			fmt.Fprintln(w, "No files changed between the given refs.")
+		}
 		return Result{ExitCode: ExitOK}, nil
 	}
 
@@ -73,7 +88,9 @@ func Run(w io.Writer, cfg Config) (Result, error) {
 		allDeltas = append(allDeltas, deltas...)
 	}
 
-	if len(unsupported) > 0 {
+	// Keep JSON stdout machine-readable. Human-facing warnings are only written
+	// for text/markdown output.
+	if len(unsupported) > 0 && cfg.Format != "json" {
 		fmt.Fprintf(w, "⚠  Skipped %d file(s) with no supported analyzer: %s\n\n",
 			len(unsupported), strings.Join(unsupported, ", "))
 	}
@@ -101,8 +118,10 @@ func applyThreshold(w io.Writer, cfg Config, deltas []interfaces.FunctionDelta) 
 		}
 	}
 	if breached > 0 {
-		fmt.Fprintf(w, "\n✗  %d function(s) exceeded the complexity threshold of +%d\n",
-			breached, cfg.Threshold)
+		if normalizeFormat(cfg.Format) != "json" {
+			fmt.Fprintf(w, "\n✗  %d function(s) exceeded the complexity threshold of +%d\n",
+				breached, cfg.Threshold)
+		}
 		return Result{ExitCode: ExitThreshold, BreachedFunctions: breached}
 	}
 	return Result{ExitCode: ExitOK}
@@ -118,4 +137,21 @@ func findAnalyzer(path, langFilter string) interfaces.Analyzer {
 		}
 	}
 	return nil
+}
+
+func normalizeFormat(format string) string {
+	format = strings.TrimSpace(strings.ToLower(format))
+	if format == "" {
+		return "text"
+	}
+	return format
+}
+
+func supportedFormat(format string) bool {
+	switch format {
+	case "text", "json", "markdown":
+		return true
+	default:
+		return false
+	}
 }

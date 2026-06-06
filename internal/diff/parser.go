@@ -15,8 +15,8 @@ func NewParser(client *Client) *Parser {
 }
 
 // BuildDiffs resolves baseRef and headRef, lists changed files, and fetches
-// the content of each file at both refs. It skips files where NewContent is
-// empty (pure deletions).
+// the content of each file at both refs. Deleted files are excluded by
+// Client.ChangedFiles before this method fetches file content.
 func (p *Parser) BuildDiffs(baseRef, headRef string) ([]FileDiff, error) {
 	if _, err := p.client.ResolveRef(baseRef); err != nil {
 		return nil, fmt.Errorf("base ref: %w", err)
@@ -40,11 +40,6 @@ func (p *Parser) BuildDiffs(baseRef, headRef string) ([]FileDiff, error) {
 		newContent, err := p.client.FileContentAt(headRef, path)
 		if err != nil {
 			return nil, fmt.Errorf("reading %s at %s: %w", path, headRef, err)
-		}
-
-		// Skip pure deletions.
-		if newContent == "" {
-			continue
 		}
 
 		diffs = append(diffs, FileDiff{
