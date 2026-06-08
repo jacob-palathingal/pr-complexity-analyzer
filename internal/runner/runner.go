@@ -5,9 +5,10 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/goast"
+	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/python"
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/diff"
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces"
-	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces/analyzers/python"
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/report"
 )
 
@@ -40,6 +41,7 @@ type Result struct {
 
 var registry = []interfaces.Analyzer{
 	python.New(),
+	goast.New(),
 }
 
 // Run executes the full pipeline and returns a Result with the exit code.
@@ -128,8 +130,9 @@ func applyThreshold(w io.Writer, cfg Config, deltas []interfaces.FunctionDelta) 
 }
 
 func findAnalyzer(path, langFilter string) interfaces.Analyzer {
+	langFilter = normalizeLangFilter(langFilter)
 	for _, a := range registry {
-		if langFilter != "" && !strings.Contains(a.Name(), langFilter) {
+		if langFilter != "" && !matchesAnalyzer(a, langFilter) {
 			continue
 		}
 		if a.Supports(path) {
@@ -154,4 +157,33 @@ func supportedFormat(format string) bool {
 	default:
 		return false
 	}
+}
+
+func normalizeLangFilter(lang string) string {
+	lang = strings.TrimSpace(strings.ToLower(lang))
+	switch lang {
+	case "py":
+		return "python"
+	case "golang":
+		return "go"
+	default:
+		return lang
+	}
+}
+
+func matchesAnalyzer(a interfaces.Analyzer, langFilter string) bool {
+	if langFilter == "" {
+		return true
+	}
+	name := strings.ToLower(a.Name())
+	if strings.Contains(name, langFilter) {
+		return true
+	}
+	if langFilter == "go" && strings.HasPrefix(name, "go/") {
+		return true
+	}
+	if langFilter == "python" && strings.HasPrefix(name, "python/") {
+		return true
+	}
+	return false
 }

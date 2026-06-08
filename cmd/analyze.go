@@ -46,7 +46,7 @@ func init() {
 	analyzeCmd.Flags().IntVar(&flagThreshold, "threshold", 0, "Exit 1 if any function delta meets or exceeds this value (0 = disabled)")
 	analyzeCmd.Flags().IntVar(&flagMinDelta, "min-delta", 0, "Only report functions with delta greater than or equal to this value")
 	analyzeCmd.Flags().StringVar(&flagFormat, "format", "text", "Output format: text, json, or markdown")
-	analyzeCmd.Flags().StringVar(&flagLang, "lang", "", "Restrict analysis to a specific language (e.g. python, go)")
+	analyzeCmd.Flags().StringVar(&flagLang, "lang", "", "Restrict analysis to a specific language (python, py, go, golang)")
 	analyzeCmd.Flags().BoolVar(&flagUnchanged, "include-unchanged", false, "Include functions with no complexity change")
 	analyzeCmd.Flags().StringVar(&flagRepoDir, "repo", "", "Path to the git repository (default: current directory)")
 

@@ -11,13 +11,13 @@ var rootCmd = &cobra.Command{
 	Use:   "pr-complexity",
 	Short: "Analyze cyclomatic complexity changes in a pull request",
 	Long: `pr-complexity computes per-function cyclomatic complexity deltas
-for every function touched by a PR diff.
+for every supported function touched by a PR diff.
 
-It checks out both the base and head snapshots, runs language-specific
-analyzers only on changed files, and outputs a ranked report of functions
-by complexity increase.
+It checks both the base and head snapshots, runs language-specific analyzers
+only on changed files, and outputs a ranked report of functions by complexity
+increase.
 
-Supported languages: Python (via Radon)
+Supported languages: Python (Radon), Go (standard-library AST)
 `,
 }
 
