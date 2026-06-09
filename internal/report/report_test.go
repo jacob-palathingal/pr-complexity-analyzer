@@ -94,3 +94,20 @@ func TestSortDeltas(t *testing.T) {
 		t.Errorf("wrong sort order: %v", deltas)
 	}
 }
+
+func TestMarkdownEscapesTableSpecialCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	deltas := []interfaces.FunctionDelta{
+		{FilePath: "weird|file.py", FunctionName: "func`name", OldComplexity: 1, NewComplexity: 3, Delta: 2},
+	}
+	if err := Generate(&buf, deltas, Options{Format: "markdown"}); err != nil {
+		t.Fatalf("Generate markdown: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "weird\\|file.py") {
+		t.Fatalf("expected escaped pipe in markdown output, got %q", out)
+	}
+	if !strings.Contains(out, "func\\`name") {
+		t.Fatalf("expected escaped backtick in markdown output, got %q", out)
+	}
+}

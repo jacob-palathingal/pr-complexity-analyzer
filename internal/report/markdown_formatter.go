@@ -25,8 +25,8 @@ func (f *MarkdownFormatter) Format(w io.Writer, deltas []interfaces.FunctionDelt
 
 	for _, d := range deltas {
 		fmt.Fprintf(w, "| `%s` | `%s` | %s | %s | %s |\n",
-			d.FilePath,
-			d.FunctionName,
+			escapeMarkdownCode(d.FilePath),
+			escapeMarkdownCode(d.FunctionName),
 			markdownScore(d.OldComplexity),
 			markdownScore(d.NewComplexity),
 			markdownDelta(d.Delta),
@@ -66,4 +66,11 @@ func markdownScore(score int) string {
 		return strings.Repeat("—", 1)
 	}
 	return fmt.Sprintf("%d", score)
+}
+
+func escapeMarkdownCode(s string) string {
+	s = strings.ReplaceAll(s, "`", "\\`")
+	s = strings.ReplaceAll(s, "|", "\\|")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
 }
