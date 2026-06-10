@@ -34,3 +34,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Local reports
+pr-complexity-report.md
+coverage.out

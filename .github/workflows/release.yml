@@ -20,18 +20,24 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Install radon (for integration tests)
-        run: pip install radon
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install radon for Python analyzer tests
+        run: pip install radon==6.*
 
       - name: Run tests
         run: go test ./...
 
-  release:
+  docker:
     name: Build & push Docker image
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -40,18 +46,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
+      - name: Extract Docker metadata
         id: meta
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
-      - name: Build and push
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   binary:
     name: Build cross-platform binaries
@@ -85,10 +96,11 @@ jobs:
         run: |
           ext=""
           [ "$GOOS" = "windows" ] && ext=".exe"
+          mkdir -p dist
           go build -trimpath -ldflags="-s -w" \
             -o "dist/pr-complexity-${{ matrix.goos }}-${{ matrix.goarch }}${ext}" .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/
+          name: pr-complexity-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/pr-complexity-${{ matrix.goos }}-${{ matrix.goarch }}*
