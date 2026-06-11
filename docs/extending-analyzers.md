@@ -1,6 +1,6 @@
 # Adding a new language analyzer
 
-`pr-complexity` uses a pluggable analyzer interface. Adding JavaScript, Ruby, Go, or any other language takes four steps and touches two files.
+`pr-complexity` uses a pluggable analyzer interface. Adding JavaScript, Ruby, Java, or another language should not require changes to git diff parsing or report formatting.
 
 ## Step 1 — Implement the interface
 
@@ -14,7 +14,7 @@ import (
     "path/filepath"
     "strings"
 
-    "github.com/yourusername/pr-complexity-analyzer/internal/interfaces"
+    "github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces"
 )
 
 type Analyzer struct{}
@@ -29,10 +29,8 @@ func (a *Analyzer) Supports(path string) bool {
 }
 
 func (a *Analyzer) Analyze(path, oldContent, newContent string) ([]interfaces.FunctionDelta, error) {
-    // Shell out to your complexity tool, parse the output,
-    // build and return []interfaces.FunctionDelta.
-    //
-    // See internal/analyzers/python/radon.go for a complete example.
+    // Shell out to a complexity tool or parse source directly.
+    // Return one FunctionDelta per function seen in either version.
     panic("not yet implemented")
 }
 ```
@@ -45,55 +43,59 @@ Open `internal/runner/runner.go` and add your analyzer to the `registry` slice:
 
 ```go
 import (
-    "github.com/yourusername/pr-complexity-analyzer/internal/analyzers/javascript"
-    "github.com/yourusername/pr-complexity-analyzer/internal/analyzers/python"
+    "github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/goast"
+    "github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/javascript"
+    "github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/python"
     // ...
 )
 
 var registry = []interfaces.Analyzer{
     python.New(),
+    goast.New(),
     javascript.New(), // ← add this line
 }
 ```
 
-That's the only core file you need to touch.
+That's the only core runtime file you should need to touch.
 
 ## Step 3 — Write tests
 
-Add `internal/analyzers/<language>/analyzer_test.go`. Follow the pattern in `internal/analyzers/python/radon_test.go`:
+Add `internal/analyzers/<language>/analyzer_test.go`. Follow the pattern in the Python and Go analyzer tests:
 
-- `skipIfNo<Tool>` — skip integration tests when the external tool is absent.
-- `TestSupports` — verify the file extension matching.
+- `TestSupports` — verify extension matching.
 - `TestAnalyze_IncreaseDetected` — confirm deltas are positive when complexity grows.
 - `TestAnalyze_NewFile` — empty `OldContent` should produce deltas with `OldComplexity == 0`.
-- `TestBuildDeltas_*` — unit-test the delta-building logic in isolation.
+- Syntax/error tests for malformed source or missing external tools.
+- Unit tests for delta-building logic or parser-specific edge cases.
 
-## Step 4 — Update the Dockerfile
+If the analyzer shells out to an external tool, make the integration tests skip cleanly when the tool is not installed.
 
-If your analyzer shells out to an external tool, install it in the `Runtime image` stage of the `Dockerfile`:
+## Step 4 — Update Docker and setup docs
+
+If your analyzer requires an external runtime or CLI, install it in the runtime stage of the `Dockerfile`:
 
 ```dockerfile
 RUN pip install --no-cache-dir radon==6.*
-# Add your tool:
+# Add your tool, for example:
 RUN npm install -g escomplex-cli
 ```
 
-And note it in `scripts/install_radon.sh` (or add a separate install script).
+Then update the README setup section and, if helpful, add a dedicated script under `scripts/`.
 
 ## Interface contract summary
 
 | Method | Signature | Notes |
 |---|---|---|
-| `Name()` | `string` | Human-readable, e.g. `"javascript/escomplex"`. Used by `--lang` filter. |
-| `Supports(path)` | `bool` | Return true for file extensions your tool handles. |
-| `Analyze(path, oldContent, newContent)` | `([]FunctionDelta, error)` | `oldContent` is empty for new files. Never receive deleted files. |
+| `Name()` | `string` | Human-readable, e.g. `"javascript/escomplex"`. Used by `--lang` filtering. |
+| `Supports(path)` | `bool` | Return true for file extensions your analyzer handles. |
+| `Analyze(path, oldContent, newContent)` | `([]FunctionDelta, error)` | `oldContent` is empty for new files. Deleted files are filtered upstream. |
 
 `FunctionDelta` fields:
 
 | Field | Type | Meaning |
 |---|---|---|
 | `FilePath` | string | Pass through the `path` argument. |
-| `FunctionName` | string | Qualified name, e.g. `"ClassName.method"`. |
-| `OldComplexity` | int | 0 if the function didn't exist before. |
+| `FunctionName` | string | Qualified name, e.g. `ClassName.method` or `Server.Route`. |
+| `OldComplexity` | int | 0 if the function did not exist before. |
 | `NewComplexity` | int | Cyclomatic complexity at head ref. |
-| `Delta` | int | `NewComplexity - OldComplexity`. Compute this yourself. |
+| `Delta` | int | `NewComplexity - OldComplexity`. |
