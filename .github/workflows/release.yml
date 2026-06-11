@@ -104,3 +104,22 @@ jobs:
         with:
           name: pr-complexity-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/pr-complexity-${{ matrix.goos }}-${{ matrix.goarch }}*
+          
+    github-release:
+      name: Create GitHub release
+      needs:
+        - docker
+        - binary
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/download-artifact@v4
+          with:
+            path: dist
+            merge-multiple: true
+
+        - name: Create release
+          uses: softprops/action-gh-release@v2
+          with:
+            files: dist/*
+            generate_release_notes: true
