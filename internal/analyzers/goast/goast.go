@@ -1,6 +1,3 @@
-// Package goast implements cyclomatic complexity analysis for Go files using
-// the standard library's go/ast parser. It does not shell out to external tools,
-// which keeps Go analysis fast and portable inside CI and Docker.
 package goast
 
 import (
@@ -11,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/analyzers/common"
 	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces"
 )
 
@@ -18,12 +16,16 @@ import (
 type Analyzer struct{}
 
 // New returns a ready-to-use Go AST Analyzer.
-func New() *Analyzer { return &Analyzer{} }
+func New() *Analyzer {
+	return &Analyzer{}
+}
 
 // Name identifies this analyzer.
-func (a *Analyzer) Name() string { return "go/ast" }
+func (a *Analyzer) Name() string {
+	return "go/ast"
+}
 
-// Supports returns true for .go source files and false for generated test files.
+// Supports returns true for .go source files.
 func (a *Analyzer) Supports(path string) bool {
 	return strings.ToLower(filepath.Ext(path)) == ".go"
 }
@@ -33,12 +35,12 @@ func (a *Analyzer) Supports(path string) bool {
 func (a *Analyzer) Analyze(path, oldContent, newContent string) ([]interfaces.FunctionDelta, error) {
 	oldScores, err := a.scoreContent(path, oldContent)
 	if err != nil {
-		return nil, fmt.Errorf("go ast (old) %s: %w", path, err)
+		return nil, fmt.Errorf("go ast old snapshot %s: %w", path, err)
 	}
 
 	newScores, err := a.scoreContent(path, newContent)
 	if err != nil {
-		return nil, fmt.Errorf("go ast (new) %s: %w", path, err)
+		return nil, fmt.Errorf("go ast new snapshot %s: %w", path, err)
 	}
 
 	return buildDeltas(path, oldScores, newScores), nil
@@ -61,8 +63,10 @@ func (a *Analyzer) scoreContent(path, content string) (map[string]int, error) {
 		if !ok || fn.Body == nil {
 			continue
 		}
+
 		scores[qualifiedName(fn)] = complexity(fn.Body)
 	}
+
 	return scores, nil
 }
 
@@ -70,6 +74,7 @@ func qualifiedName(fn *ast.FuncDecl) string {
 	if fn.Recv == nil || len(fn.Recv.List) == 0 {
 		return fn.Name.Name
 	}
+
 	return receiverName(fn.Recv.List[0].Type) + "." + fn.Name.Name
 }
 
@@ -90,9 +95,8 @@ func receiverName(expr ast.Expr) string {
 	}
 }
 
-// complexity returns cyclomatic complexity for a Go function body. It starts at
-// 1 for the straight-line path and increments for common Go decision points:
-// if/for/range, switch/select cases, and boolean &&/|| operators.
+// complexity returns cyclomatic complexity for a Go function body.
+// It starts at 1 and increments for common Go decision points.
 func complexity(body *ast.BlockStmt) int {
 	score := 1
 
@@ -101,17 +105,17 @@ func complexity(body *ast.BlockStmt) int {
 		case nil:
 			return true
 		case *ast.FuncLit:
-			// Do not fold nested anonymous functions into the enclosing function's
-			// score. They are independent executable units.
+			// Do not fold nested anonymous functions into the enclosing
+			// function's score. They are independent executable units.
 			return false
 		case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt:
 			score++
 		case *ast.CaseClause:
-			if x.List != nil { // default does not add a branch.
+			if x.List != nil {
 				score++
 			}
 		case *ast.CommClause:
-			if x.Comm != nil { // default does not add a branch.
+			if x.Comm != nil {
 				score++
 			}
 		case *ast.BinaryExpr:
@@ -119,32 +123,15 @@ func complexity(body *ast.BlockStmt) int {
 				score++
 			}
 		}
+
 		return true
 	})
 
 	return score
 }
 
-func buildDeltas(filePath string, old, new map[string]int) []interfaces.FunctionDelta {
-	seen := make(map[string]struct{})
-	for k := range old {
-		seen[k] = struct{}{}
-	}
-	for k := range new {
-		seen[k] = struct{}{}
-	}
-
-	deltas := make([]interfaces.FunctionDelta, 0, len(seen))
-	for name := range seen {
-		oldC := old[name]
-		newC := new[name]
-		deltas = append(deltas, interfaces.FunctionDelta{
-			FilePath:      filePath,
-			FunctionName:  name,
-			OldComplexity: oldC,
-			NewComplexity: newC,
-			Delta:         newC - oldC,
-		})
-	}
-	return deltas
+// buildDeltas is kept package-local for existing tests while delegating to the
+// shared deterministic implementation.
+func buildDeltas(filePath string, oldScores, newScores map[string]int) []interfaces.FunctionDelta {
+	return common.BuildDeltas(filePath, "go", "go/ast", oldScores, newScores)
 }
