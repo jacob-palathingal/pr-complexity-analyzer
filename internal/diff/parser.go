@@ -3,8 +3,7 @@ package diff
 import "fmt"
 
 // Parser builds FileDiff structs by combining the git Client's ref-resolution
-// and file-content retrieval. It is the entry point for the rest of the
-// application — call BuildDiffs, get back a slice ready for analyzers.
+// and file-content retrieval.
 type Parser struct {
 	client *Client
 }
@@ -15,12 +14,19 @@ func NewParser(client *Client) *Parser {
 }
 
 // BuildDiffs resolves baseRef and headRef, lists changed files, and fetches
-// the content of each file at both refs. Deleted files are excluded by
-// Client.ChangedFiles before this method fetches file content.
+// the content of each file at both refs.
 func (p *Parser) BuildDiffs(baseRef, headRef string) ([]FileDiff, error) {
+	return p.BuildDiffsFiltered(baseRef, headRef, nil)
+}
+
+// BuildDiffsFiltered is BuildDiffs with an optional path-level predicate.
+// Filtering before FileContentAt avoids loading unsupported or irrelevant blobs
+// in large company repositories.
+func (p *Parser) BuildDiffsFiltered(baseRef, headRef string, include func(path string) bool) ([]FileDiff, error) {
 	if _, err := p.client.ResolveRef(baseRef); err != nil {
 		return nil, fmt.Errorf("base ref: %w", err)
 	}
+
 	if _, err := p.client.ResolveRef(headRef); err != nil {
 		return nil, fmt.Errorf("head ref: %w", err)
 	}
@@ -32,6 +38,10 @@ func (p *Parser) BuildDiffs(baseRef, headRef string) ([]FileDiff, error) {
 
 	diffs := make([]FileDiff, 0, len(paths))
 	for _, path := range paths {
+		if include != nil && !include(path) {
+			continue
+		}
+
 		oldContent, err := p.client.FileContentAt(baseRef, path)
 		if err != nil {
 			return nil, fmt.Errorf("reading %s at %s: %w", path, baseRef, err)
