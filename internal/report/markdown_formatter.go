@@ -4,47 +4,60 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/interfaces"
 )
 
-// MarkdownFormatter renders a GitHub-flavored Markdown table suitable for
-// posting as a PR comment.
+// MarkdownFormatter renders a GitHub-flavored Markdown table suitable for PR comments.
 type MarkdownFormatter struct{}
 
-func (f *MarkdownFormatter) Format(w io.Writer, deltas []interfaces.FunctionDelta) error {
+func (f *MarkdownFormatter) Format(w io.Writer, payload Payload) error {
+	deltas := payload.Results
+
 	if len(deltas) == 0 {
 		_, err := fmt.Fprintln(w, "✅ **No complexity increases found in this PR.**")
 		return err
 	}
 
-	fmt.Fprintf(w, "## PR Complexity Report\n\n")
-	fmt.Fprintf(w, "**%d function(s) changed complexity**\n\n", len(deltas))
+	fmt.Fprintln(w, "## PR Complexity Report")
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "**%d function(s) reported** from **%d analyzed function(s)**.\n\n", len(deltas), payload.Summary.AnalyzedFunctions)
+
+	if payload.Summary.Threshold > 0 {
+		fmt.Fprintf(w, "- Threshold: `+%d`\n", payload.Summary.Threshold)
+		fmt.Fprintf(w, "- Breaches: `%d`\n", payload.Summary.BreachedFunctions)
+		fmt.Fprintf(w, "- Max delta: `+%d`\n\n", payload.Summary.MaxDelta)
+	}
+
 	fmt.Fprintln(w, "| File | Function | Before | After | Delta |")
 	fmt.Fprintln(w, "|------|----------|-------:|------:|------:|")
 
-	for _, d := range deltas {
-		fmt.Fprintf(w, "| `%s` | `%s` | %s | %s | %s |\n",
-			escapeMarkdownCode(d.FilePath),
-			escapeMarkdownCode(d.FunctionName),
-			markdownScore(d.OldComplexity),
-			markdownScore(d.NewComplexity),
-			markdownDelta(d.Delta),
+	for _, delta := range deltas {
+		fmt.Fprintf(
+			w,
+			"| `%s` | `%s` | %s | %s | %s |\n",
+			escapeMarkdownCode(delta.FilePath),
+			escapeMarkdownCode(delta.FunctionName),
+			markdownScore(delta.OldComplexity),
+			markdownScore(delta.NewComplexity),
+			markdownDelta(delta.Delta),
 		)
 	}
 
 	fmt.Fprintln(w)
 
-	// Summary line for quick scanning.
+	if payload.Summary.BreachedFunctions > 0 {
+		fmt.Fprintf(w, "> ❌ %d function(s) exceeded the configured complexity threshold.\n", payload.Summary.BreachedFunctions)
+		return nil
+	}
+
 	increased := 0
-	for _, d := range deltas {
-		if d.Delta > 0 {
+	for _, delta := range deltas {
+		if delta.Delta > 0 {
 			increased++
 		}
 	}
+
 	if increased > 0 {
-		fmt.Fprintf(w, "> ⚠️ %d function(s) increased in complexity. ", increased)
-		fmt.Fprintf(w, "Consider breaking complex functions into smaller pieces.\n")
+		fmt.Fprintf(w, "> ⚠️ %d function(s) increased in complexity. Consider breaking complex functions into smaller pieces.\n", increased)
 	}
 
 	return nil
@@ -63,14 +76,16 @@ func markdownDelta(delta int) string {
 
 func markdownScore(score int) string {
 	if score == 0 {
-		return strings.Repeat("—", 1)
+		return "—"
 	}
+
 	return fmt.Sprintf("%d", score)
 }
 
-func escapeMarkdownCode(s string) string {
-	s = strings.ReplaceAll(s, "`", "\\`")
-	s = strings.ReplaceAll(s, "|", "\\|")
-	s = strings.ReplaceAll(s, "\n", " ")
-	return s
+func escapeMarkdownCode(value string) string {
+	value = strings.ReplaceAll(value, "`", "\\`")
+	value = strings.ReplaceAll(value, "|", "\\|")
+	value = strings.ReplaceAll(value, "\n", " ")
+
+	return value
 }

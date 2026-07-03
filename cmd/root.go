@@ -4,27 +4,30 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jacob-palathingal/pr-complexity-analyzer/internal/runner"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "pr-complexity",
-	Short: "Analyze cyclomatic complexity changes in a pull request",
-	Long: `pr-complexity computes per-function cyclomatic complexity deltas
-for every supported function touched by a PR diff.
-
-It checks both the base and head snapshots, runs language-specific analyzers
-only on changed files, and outputs a ranked report of functions by complexity
-increase.
-
-Supported languages: Python (Radon), Go (standard-library AST)
-`,
+	Use:           "pr-complexity",
+	Short:         "Analyze cyclomatic complexity changes in a pull request",
+	Long:          "pr-complexity computes per-function cyclomatic complexity deltas for every supported function touched by a pull request diff.",
+	Version:       versionString(),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+			if err.Error() != "" {
+				fmt.Fprintln(os.Stderr, err)
+			}
+			os.Exit(exitErr.ExitCode())
+		}
+
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(runner.ExitToolError)
 	}
 }
 

@@ -30,14 +30,41 @@ func TestGenerate_TextOutput(t *testing.T) {
 
 func TestGenerate_JSONOutput(t *testing.T) {
 	var buf bytes.Buffer
-	if err := Generate(&buf, testDeltas, Options{Format: "json"}); err != nil {
+
+	if err := Generate(&buf, testDeltas, Options{
+		Format:            "json",
+		Threshold:         5,
+		BreachedFunctions: 2,
+		ExitCode:          1,
+		LangFilter:        "python",
+		Include:           []string{"src/**"},
+		Exclude:           []string{"src/generated/**"},
+	}); err != nil {
 		t.Fatalf("Generate (json): %v", err)
 	}
-	var report jsonReport
-	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+
+	var payload Payload
+	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
 		t.Fatalf("JSON unmarshal: %v", err)
 	}
-	if len(report.Results) == 0 {
+
+	if payload.SchemaVersion != "1.0" {
+		t.Fatalf("expected schema_version 1.0, got %q", payload.SchemaVersion)
+	}
+
+	if payload.Summary.ExitCode != 1 {
+		t.Fatalf("expected exit_code 1, got %d", payload.Summary.ExitCode)
+	}
+
+	if payload.Summary.BreachedFunctions != 2 {
+		t.Fatalf("expected breached_functions 2, got %d", payload.Summary.BreachedFunctions)
+	}
+
+	if payload.Filters.Language != "python" {
+		t.Fatalf("expected language filter python, got %q", payload.Filters.Language)
+	}
+
+	if len(payload.Results) == 0 {
 		t.Error("expected non-empty Results in JSON output")
 	}
 }
