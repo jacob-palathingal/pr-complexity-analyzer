@@ -27,8 +27,9 @@ type Options struct {
 }
 
 // ShouldAnalyze returns true when a path should be considered for analysis.
-// It intentionally handles a small, dependency-free glob subset that covers
-// common monorepo use cases: exact paths, *, ** suffixes, and **/file patterns.
+//
+// Exclusions take precedence over inclusions. Tests and common generated or
+// dependency directories are excluded by default.
 func ShouldAnalyze(filePath string, opts Options) bool {
 	filePath = normalize(filePath)
 
@@ -40,7 +41,12 @@ func ShouldAnalyze(filePath string, opts Options) bool {
 		return false
 	}
 
-	excludes := append([]string{}, defaultExcludes...)
+	excludes := make(
+		[]string,
+		0,
+		len(defaultExcludes)+len(opts.Exclude),
+	)
+	excludes = append(excludes, defaultExcludes...)
 	excludes = append(excludes, opts.Exclude...)
 
 	for _, pattern := range excludes {
@@ -63,16 +69,31 @@ func ShouldAnalyze(filePath string, opts Options) bool {
 }
 
 func isTestFile(filePath string) bool {
-	return strings.HasSuffix(filePath, "_test.go") ||
-		strings.HasSuffix(filePath, "_test.py") ||
-		strings.Contains(filePath, "/test/") ||
-		strings.Contains(filePath, "/tests/")
+	baseName := path.Base(filePath)
+
+	if strings.HasSuffix(baseName, "_test.go") ||
+		strings.HasSuffix(baseName, "_test.py") {
+		return true
+	}
+
+	segments := strings.Split(filePath, "/")
+	for _, segment := range segments[:len(segments)-1] {
+		if segment == "test" || segment == "tests" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalize(value string) string {
 	value = strings.ReplaceAll(value, "\\", "/")
 	value = strings.TrimSpace(value)
-	value = strings.TrimPrefix(value, "./")
+
+	for strings.HasPrefix(value, "./") {
+		value = strings.TrimPrefix(value, "./")
+	}
+
 	return value
 }
 
@@ -90,21 +111,24 @@ func match(pattern, filePath string) bool {
 
 	if strings.HasSuffix(pattern, "/**") {
 		prefix := strings.TrimSuffix(pattern, "/**")
-		return filePath == prefix || strings.HasPrefix(filePath, prefix+"/")
+
+		return filePath == prefix ||
+			strings.HasPrefix(filePath, prefix+"/")
 	}
 
 	if strings.HasPrefix(pattern, "**/") {
 		suffix := strings.TrimPrefix(pattern, "**/")
-		if ok, _ := path.Match(suffix, path.Base(filePath)); ok {
+
+		if matched, _ := path.Match(
+			suffix,
+			path.Base(filePath),
+		); matched {
 			return true
 		}
 
 		return strings.HasSuffix(filePath, "/"+suffix)
 	}
 
-	if ok, _ := path.Match(pattern, filePath); ok {
-		return true
-	}
-
-	return false
+	matched, _ := path.Match(pattern, filePath)
+	return matched
 }
